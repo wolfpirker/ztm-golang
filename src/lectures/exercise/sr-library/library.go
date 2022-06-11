@@ -51,7 +51,7 @@ type Library struct{
 	books   map[Title] BookEntry
 }
 
-func checkOut(lib *Library, title Title, mem *Member) bool{
+func checkOutBook(lib *Library, title Title, mem *Member) bool{
 	// also make sure the book is part of the library 
 	bookEntry, bookInLib := lib.books[title]
 	if !bookInLib {
@@ -70,11 +70,34 @@ func checkOut(lib *Library, title Title, mem *Member) bool{
 	lib.books[title] = bookEntry // required to update bookEntry!
 
 	// Update member info
-	/* ATTENTION: leads to panic: assignment to entry in nil map!
 	mem.books[title] = LendAudit{
 		lastCheckedOut: time.Now()}
-		FIXME!!!
-	*/
+	return true
+}
+
+func checkInBook(lib *Library, title Title, mem *Member) bool{
+	// only allow check in when it is a known library book
+	bookEntry, bookInLib := lib.books[title]
+	if !bookInLib {
+		fmt.Println("book does not belong to library!")
+		return false
+	}
+	
+	// check if book was borrowed by this member; if not don't accept book#
+	audit, bookLendedByMember := mem.books[title]
+	if !bookLendedByMember{
+		fmt.Println("book was not borrowed by this member! No check-in possible!")
+		return false
+	}
+
+	// decrease the lended bookEntry counter and put the LendAudit timestamp
+	bookEntry.lended -= 1;
+	lib.books[title] = bookEntry
+
+	// mem.books[title].lastReturned = time.Now() // Not like this!
+	audit.lastReturned = time.Now();
+	mem.books[title] = audit
+
 	return true
 }
 
@@ -92,10 +115,20 @@ func printMemberAudits(lib *Library){
 }
 
 func printSingleMemberAudit(mem *Member){
-	fmt.Println("Name of Member:", mem.name)
-	fmt.Println("borrowed books...")
+	if len(mem.books) > 0 {
+		fmt.Println("Name of Member:", mem.name)
+		fmt.Println("borrowed books:")
+	}
+
 	for title, entry := range mem.books {
-		fmt.Println("borrowed", title, "on", entry.lastCheckedOut)
+		// check whether a book was not returned yet
+		var returnTime string
+		if entry.lastReturned.IsZero() {
+			returnTime = "[not returned yet]"
+		} else{
+			returnTime = entry.lastReturned.String()
+		}
+		fmt.Println("borrowed", title, "on", entry.lastCheckedOut, "last returned:", returnTime)
 	}
 }
 
@@ -119,14 +152,18 @@ func main() {
 			totalAmount: rand.Intn(3) + 1}	
 	}
 	for i := range(members) {
+		// Note: books Map requires initialization with make!
+		// otherwise "panic: assignment to entry in nil map!" possible
+		var lendHistory = make(map[Title]LendAudit, 4) 
 		memberMap[members[i]] = Member{
-			name: members[i]}	
+			name: members[i],
+			books: lendHistory}	
 	}
 
 	//  - Check out a book
 	member := myLibrary.members[members[1]]
 	
-	checkedOut := checkOut(&myLibrary, titles[0], &member) // Note: use of references!
+	checkedOut := checkOutBook(&myLibrary, titles[0], &member) // Note: use of references!
 
 	if checkedOut {
 		fmt.Println("\nCheck out a book. New Status:")
@@ -135,9 +172,20 @@ func main() {
 	}
 
 	//  - Check in a book
+	returned := checkInBook(&myLibrary, titles[1], &member)
 
-	//  - Print out initial library information, and after each change
-	//* There must only ever be one copy of the library in memory at any time	
+	if returned {
+		fmt.Println("\nCheck in a book. New Status:")
+		printLibraryBooks(&myLibrary)
+		printMemberAudits(&myLibrary)
+	}
 
+	//  - Check in a book again, with success
+	returned = checkInBook(&myLibrary, titles[0], &member)
+	if returned {
+		fmt.Println("\nCheck in a book. New Status:")
+		printLibraryBooks(&myLibrary)
+		printMemberAudits(&myLibrary)
+	}
 
 }
