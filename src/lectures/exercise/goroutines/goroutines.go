@@ -34,6 +34,59 @@ import (
 	"time"
 )
 
+//* Sum the numbers in each file noted in the main() function
+func sumFile(rd bufio.Reader) int{
+	sum := 0
+	for {
+		line, err := rd.ReadString('\n')
+
+		if err == io.EOF {
+			return sum
+		} else if err != nil {
+			//* Report any errors to the terminal
+			fmt.Println("Error:", err)
+		}
+
+		// ReadString returns the delimiter as well (newline).
+		// so we just slice the string up until the last byte.
+		num, err := strconv.Atoi(line[:len(line)-1])
+		if err != nil {
+			//* Report any errors to the terminal
+			fmt.Println("Error:", err)
+			continue
+		}
+		sum += num		
+	}
+}
+
 func main() {
 	files := []string{"num1.txt", "num2.txt", "num3.txt", "num4.txt", "num5.txt"}
+	totalSum := 0
+
+	//* Add each sum together to get a grand total for all files
+	//  - Print the grand total to the terminal
+	for i := 0; i < len(files); i++ {
+		file, err := os.Open(files[i])
+		if err != nil {
+			//* Report any errors to the terminal
+			fmt.Println("Error:", err)
+			return
+		}
+
+		rd := bufio.NewReader(file)
+
+		calculate := func() {
+			fileSum := sumFile(*rd)
+			//* Add each sum together to get a grand total for all files
+			totalSum += fileSum
+		}
+		//* Launch a goroutine for each file
+		go calculate()
+	}
+
+	// Need to wait for goroutines to finish. Increase if needed.
+	time.Sleep(100 * time.Millisecond)
+
+	//  - Print the grand total to the terminal
+	fmt.Println(totalSum)
 }
